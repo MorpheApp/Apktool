@@ -101,7 +101,7 @@ public class Main {
         .desc("Only disassemble the main dex classes (classes[0-9]*.dex) in the root.")
         .build();
 
-    private static final Option decodeNoDebugInfoOption = Option.builder()
+    private static final Option decodeNoDebugInfoOption = Option.builder("b")
         .longOpt("no-debug-info")
         .desc("Do not include debug info in sources (.local, .param, .line, etc.)")
         .build();
