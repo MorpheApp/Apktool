@@ -33,7 +33,12 @@ public final class AaptManager {
     }
 
     public static String getBinaryName() {
-        return "aapt2";
+        if (OSDetection.isTermux()) {
+            String osArch = OSDetection.osArch();
+            return "aapt2_" + osArch;
+        } else {
+            return "aapt2";
+        }
     }
 
     public static File getBinaryFile() throws AndrolibException {
@@ -45,7 +50,11 @@ public final class AaptManager {
 
         StringBuilder binPath = new StringBuilder("/prebuilt/");
         if (OSDetection.isUnix()) {
-            binPath.append("linux"); // ELF 64-bit LSB executable, x86-64
+            if (OSDetection.isTermux()) {
+                binPath.append("android");
+            } else {
+                binPath.append("linux");
+            }
         } else if (OSDetection.isMacOSX()) {
             binPath.append("macosx"); // fat binary x86_64 + arm64
         } else if (OSDetection.isWindows()) {

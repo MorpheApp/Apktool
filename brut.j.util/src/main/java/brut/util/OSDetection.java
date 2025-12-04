@@ -24,6 +24,10 @@ public final class OSDetection {
         // Private constructor for utility class.
     }
 
+    public static String osArch() {
+        return System.getProperty("os.arch");
+    }
+
     public static boolean isAndroid() {
         try {
             Class.forName("android.app.Activity");
@@ -31,6 +35,11 @@ public final class OSDetection {
         } catch (ClassNotFoundException ignored) {
             return false;
         }
+    }
+
+    public static boolean isTermux() {
+        String userName = System.getProperty("user.home");
+        return userName != null && userName.contains("com.termux");
     }
 
     public static boolean isWindows() {
