@@ -103,13 +103,7 @@ public class AndroidManifestPullStreamDecoder implements ResStreamDecoder {
                 if (value.isEmpty()) {
                     continue;
                 }
-                if (ns.isEmpty()) {
-                    if (name.equals("package")) {
-                        // This is temporary and will be compared to actual
-                        // resources package later.
-                        resourcesInfo.setPackageName(value);
-                    }
-                } else if (ns.equals(BinaryXmlResourceParser.ANDROID_RES_NS)) {
+                if (!ns.isEmpty() && ns.equals(BinaryXmlResourceParser.ANDROID_RES_NS)) {
                     switch (name) {
                         case "versionCode":
                             versionInfo.setVersionCode(value);
@@ -117,6 +111,13 @@ public class AndroidManifestPullStreamDecoder implements ResStreamDecoder {
                         case "versionName":
                             versionInfo.setVersionName(value);
                             break;
+                    }
+                } else {
+                    String manifestPackage = resourcesInfo.getPackageName();
+                    if (name.equals("package") && (ns.isEmpty() || manifestPackage == null || manifestPackage.isEmpty())) {
+                        // This is temporary and will be compared to actual
+                        // resources package later.
+                        resourcesInfo.setPackageName(value);
                     }
                 }
             }

@@ -124,7 +124,7 @@ public class ResourcesDecoder {
         }
     }
 
-    private XmlSerializer newXmlSerializer() throws AndrolibException {
+    public XmlSerializer newXmlSerializer() throws AndrolibException {
         try {
             XmlSerializer serial = new MXSerializer();
             serial.setFeature(MXSerializer.FEATURE_ATTR_VALUE_NO_ESCAPE, true);

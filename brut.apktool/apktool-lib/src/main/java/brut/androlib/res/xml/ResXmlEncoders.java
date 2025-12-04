@@ -42,8 +42,6 @@ public final class ResXmlEncoders {
             case TypedValue.TYPE_ATTRIBUTE:
             case TypedValue.TYPE_DYNAMIC_ATTRIBUTE:
                 return "?" + data;
-            case TypedValue.TYPE_STRING:
-                throw new IllegalArgumentException("Unexpected data type: TYPE_STRING");
             case TypedValue.TYPE_FLOAT:
                 return Float.toString(Float.intBitsToFloat(data));
             case TypedValue.TYPE_DIMENSION:

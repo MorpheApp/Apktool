@@ -69,6 +69,10 @@ public class ResTable {
         return mMainPackage;
     }
 
+    public Set<ResPackage> getFramePackages() {
+        return mFramePackages;
+    }
+
     public void loadMainPackage() throws AndrolibException {
         LOGGER.info("Loading resource table...");
         File apkFile = mApkInfo.getApkFile();

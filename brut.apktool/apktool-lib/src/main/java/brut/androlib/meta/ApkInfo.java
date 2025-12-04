@@ -45,7 +45,7 @@ public class ApkInfo implements YamlSerializable {
 
     private String mVersion;
     private String mApkFileName;
-    private final UsesFramework mUsesFramework;
+    private UsesFramework mUsesFramework;
     private final List<String> mUsesLibrary;
     private final SdkInfo mSdkInfo;
     private final VersionInfo mVersionInfo;
@@ -193,6 +193,10 @@ public class ApkInfo implements YamlSerializable {
 
     public UsesFramework getUsesFramework() {
         return mUsesFramework;
+    }
+
+    public void setUsesFramework(UsesFramework usesFramework) {
+        this.mUsesFramework = usesFramework;
     }
 
     public List<String> getUsesLibrary() {
