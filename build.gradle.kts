@@ -37,18 +37,6 @@ val gitBranch: String? by lazy {
 }
 
 if ("release" !in gradle.startParameter.taskNames) {
-    val hash = this.gitDescribe
-
-    if (hash == null) {
-        gitRevision = "dirty"
-        apktoolVersion = "$version-dirty"
-        project.logger.lifecycle("Building SNAPSHOT (no .git folder found)")
-    } else {
-        gitRevision = hash
-        apktoolVersion = "$hash-SNAPSHOT"
-        project.logger.lifecycle("Building SNAPSHOT ($gitBranch): $gitRevision")
-    }
-} else {
     gitRevision = ""
     apktoolVersion = if (suffix.isNotEmpty()) "$version-$suffix" else version;
     project.logger.lifecycle("Building RELEASE ($gitBranch): $apktoolVersion")
@@ -101,21 +89,17 @@ subprojects {
         publishing {
             repositories {
                 maven {
-                    url = if (suffix.contains("SNAPSHOT")) {
-                        uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-                    } else {
-                        uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
-                    }
+                    url = uri("https://maven.pkg.github.com/MorpheApp/Apktool")
                     credentials {
-                        username = (project.properties["ossrhUsername"] ?: "").toString()
-                        password = (project.properties["ossrhPassword"] ?: "").toString()
+                        username = System.getenv("GITHUB_ACTOR") ?: project.findProperty("gpr.user").toString()
+                        password = System.getenv("GITHUB_TOKEN") ?: project.findProperty("gpr.key").toString()
                     }
                 }
             }
             publications {
                 register("mavenJava", MavenPublication::class) {
                     from(components["java"])
-                    groupId = "org.apktool"
+                    groupId = "app.morphe"
                     artifactId = project.name
                     version = apktoolVersion
 
@@ -143,9 +127,9 @@ subprojects {
                             }
                         }
                         scm {
-                            connection = "scm:git:git://github.com/iBotPeaches/Apktool.git"
-                            developerConnection = "scm:git:git@github.com:iBotPeaches/Apktool.git"
-                            url = "https://github.com/iBotPeaches/Apktool"
+                            connection = "scm:git:git://github.com/MorpheApp/Apktool.git"
+                            developerConnection = "scm:git:git@github.com:MorpheApp/Apktool.git"
+                            url = "https://github.com/MorpheApp/Apktool"
                         }
                     }
                 }
