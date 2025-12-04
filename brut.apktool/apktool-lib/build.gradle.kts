@@ -5,6 +5,7 @@ dependencies {
     api(project(":brut.j.xml"))
     api(project(":brut.j.yaml"))
 
+    compileOnly(libs.android)
     implementation(libs.baksmali)
     implementation(libs.smali)
     implementation(libs.guava)

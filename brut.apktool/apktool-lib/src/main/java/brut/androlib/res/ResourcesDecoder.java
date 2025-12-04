@@ -30,6 +30,7 @@ import brut.androlib.res.xml.ValuesXmlSerializable;
 import brut.directory.Directory;
 import brut.directory.DirectoryException;
 import brut.directory.ExtFile;
+import brut.util.OSDetection;
 import brut.xmlpull.MXSerializer;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -69,7 +70,10 @@ public class ResourcesDecoder {
 
         Map<ResFileDecoder.Type, ResStreamDecoder> decoders = new HashMap<>();
         decoders.put(ResFileDecoder.Type.UNKNOWN, new ResRawStreamDecoder());
-        decoders.put(ResFileDecoder.Type.PNG_9PATCH, new ResNinePatchStreamDecoder());
+        decoders.put(
+            ResFileDecoder.Type.PNG_9PATCH,
+            OSDetection.isAndroid() ? new ResNinePatchAndroidStreamDecoder() : new ResNinePatchStreamDecoder()
+        );
 
         BinaryXmlResourceParser parser = new BinaryXmlResourceParser(mTable);
         XmlSerializer serial = newXmlSerializer();

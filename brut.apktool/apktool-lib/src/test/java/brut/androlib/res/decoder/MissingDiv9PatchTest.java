@@ -19,8 +19,7 @@ package brut.androlib.res.decoder;
 import brut.androlib.BaseTest;
 import brut.androlib.TestUtils;
 import brut.androlib.res.decoder.data.NinePatchData;
-import brut.common.BrutException;
-import brut.directory.ExtFile;
+import brut.util.OSDetection;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -46,7 +45,7 @@ public class MissingDiv9PatchTest extends BaseTest {
         byte[] data;
 
         try (InputStream in = Files.newInputStream(file.toPath())) {
-            ResNinePatchStreamDecoder decoder = new ResNinePatchStreamDecoder();
+            ResStreamDecoder decoder = OSDetection.isAndroid() ? new ResNinePatchAndroidStreamDecoder() : new ResNinePatchStreamDecoder();
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             decoder.decode(in, out);
             data = out.toByteArray();

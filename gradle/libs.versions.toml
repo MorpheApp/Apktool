@@ -1,4 +1,5 @@
 [versions]
+android = "4.1.1.4"
 baksmali = "b6365a84f4" # https://github.com/google/smali/issues/100
 commons_io = "2.21.0"
 commons_cli = "1.11.0"
@@ -12,6 +13,7 @@ xmlpull = "1.1.3.1"
 xmlunit = "2.11.0"
 
 [libraries]
+android = { module = "com.google.android:android", version.ref = "android" }
 baksmali = { module = "com.github.iBotPeaches.smali:smali-baksmali", version.ref = "baksmali" }
 commons_cli = { module = "commons-cli:commons-cli", version.ref = "commons_cli"}
 commons_io = { module = "commons-io:commons-io", version.ref = "commons_io" }
