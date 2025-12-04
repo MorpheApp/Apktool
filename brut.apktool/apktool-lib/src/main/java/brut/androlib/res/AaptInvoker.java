@@ -23,7 +23,6 @@ import brut.common.BrutException;
 import brut.util.OS;
 
 import java.io.File;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +55,10 @@ public class AaptInvoker {
         File resourcesZip = null;
 
         if (resDir != null) {
-            resourcesZip = Paths.get(resDir.getParent(), "build", "resources.zip").toFile();
+            File buildDir = new File(resDir.getParent(), "build");
+            //noinspection ResultOfMethodCallIgnored
+            buildDir.mkdir();
+            resourcesZip = new File(buildDir, "resources.zip");
 
             if (!resourcesZip.exists()) {
                 // Compile the files into flat arsc files.
