@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.table.value;
 
-import android.util.TypedValue;
+import app.morphe.apktool.util.TypedValue;
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.table.ResEntry;
 import brut.androlib.res.xml.ResXmlEncodable;

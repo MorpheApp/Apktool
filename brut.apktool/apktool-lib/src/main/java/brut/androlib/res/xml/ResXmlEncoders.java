@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.xml;
 
-import android.util.TypedValue;
+import app.morphe.apktool.util.TypedValue;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 

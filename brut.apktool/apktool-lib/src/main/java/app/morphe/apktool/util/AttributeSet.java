@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package android.util;
+package app.morphe.apktool.util;
 
 /**
  * A collection of attributes, as found associated with a tag in an XML

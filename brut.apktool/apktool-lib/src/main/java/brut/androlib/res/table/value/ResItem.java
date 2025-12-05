@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.table.value;
 
-import android.util.TypedValue;
+import app.morphe.apktool.util.TypedValue;
 import brut.androlib.res.table.ResId;
 import brut.androlib.res.table.ResPackage;
 import com.google.common.collect.Sets;
