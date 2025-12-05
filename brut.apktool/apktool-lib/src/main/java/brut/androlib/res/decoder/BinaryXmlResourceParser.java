@@ -16,8 +16,8 @@
  */
 package brut.androlib.res.decoder;
 
-import android.content.res.XmlResourceParser;
-import android.util.TypedValue;
+import app.morphe.apktool.content.res.XmlResourceParser;
+import app.morphe.apktool.util.TypedValue;
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.exceptions.FrameworkNotFoundException;
 import brut.androlib.exceptions.UndefinedResObjectException;
@@ -32,9 +32,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.InputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.Reader;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
