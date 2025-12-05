@@ -1,7 +1,7 @@
 import java.io.ByteArrayOutputStream
 
 val version = "3.0.0"
-val suffix = "SNAPSHOT"
+val suffix = ".r2-SNAPSHOT"
 
 // Strings embedded into the build.
 var gitRevision by extra("")
@@ -38,7 +38,7 @@ val gitBranch: String? by lazy {
 
 if ("release" !in gradle.startParameter.taskNames) {
     gitRevision = ""
-    apktoolVersion = if (suffix.isNotEmpty()) "$version-$suffix" else version;
+    apktoolVersion = if (suffix.isNotEmpty()) "${version}${suffix}" else version;
     project.logger.lifecycle("Building RELEASE ($gitBranch): $apktoolVersion")
 }
 
