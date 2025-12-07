@@ -25,6 +25,7 @@ import brut.androlib.res.data.ResTable;
 import brut.androlib.res.data.arsc.ARSCData;
 import brut.androlib.res.data.arsc.FlagsOffset;
 import brut.util.BrutIO;
+import brut.util.Jar;
 import brut.util.OS;
 
 import java.io.*;
@@ -198,7 +199,7 @@ public class Framework {
     }
 
     private InputStream getAndroidFrameworkAsStream() {
-        return getClass().getResourceAsStream("/prebuilt/android-framework.jar");
+        return Jar.class.getResourceAsStream("/brut/androlib/android-framework.jar");
     }
 
     public void emptyDirectory() throws AndrolibException {
