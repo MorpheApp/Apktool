@@ -16,12 +16,16 @@
  */
 package brut.androlib.res.decoder;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.exceptions.CantFind9PatchChunkException;
 import brut.androlib.res.data.ninepatch.NinePatchData;
 import brut.androlib.res.data.ninepatch.OpticalInset;
 import brut.util.ExtDataInput;
 import brut.util.ExtDataInputStream;
+import brut.util.OSDetection;
 import org.apache.commons.io.IOUtils;
 
 import javax.imageio.ImageIO;
@@ -36,15 +40,157 @@ public class Res9patchStreamDecoder implements ResStreamDecoder {
     private static final int NP_COLOR = 0xff000000;
     private static final int OI_COLOR = 0xffff0000;
 
+    private static OSDecoder decoder;
+
+    {
+        decoder = OSDetection.isAndroid()
+            ? new AndroidImpl()
+            : new OtherImpl();
+    }
+
     @Override
     public void decode(InputStream in, OutputStream out) throws AndrolibException {
         try {
             byte[] data = IOUtils.toByteArray(in);
+            if (data.length == 0) return;
+            decoder.decode(data, out);
+        } catch (IOException | NullPointerException ex) {
+            // In my case this was triggered because a .png file was
+            // containing a html document instead of an image.
+            // This could be more verbose and try to MIME ?
+            throw new AndrolibException(ex);
+        }
+    }
 
-            if (data.length == 0) {
+    private NinePatchData getNinePatch(byte[] data) throws AndrolibException, IOException {
+        ExtDataInput in = ExtDataInputStream.bigEndian(new ByteArrayInputStream(data));
+        find9patchChunk(in, NP_CHUNK_TYPE);
+        return NinePatchData.decode(in);
+    }
+
+    private OpticalInset getOpticalInset(byte[] data) throws AndrolibException, IOException {
+        ExtDataInput in = ExtDataInputStream.bigEndian(new ByteArrayInputStream(data));
+        find9patchChunk(in, OI_CHUNK_TYPE);
+        return OpticalInset.decode(in);
+    }
+
+    private void find9patchChunk(DataInput in, int magic) throws AndrolibException, IOException {
+        in.skipBytes(8);
+        while (true) {
+            int size;
+            try {
+                size = in.readInt();
+            } catch (IOException ex) {
+                throw new CantFind9PatchChunkException("Could not find nine patch chunk", ex);
+            }
+            if (in.readInt() == magic) {
                 return;
             }
+            in.skipBytes(size + 4);
+        }
+    }
 
+    private void drawHLine(Bitmap bm, int y, int x1, int x2) {
+        for (int x = x1; x <= x2; x++) {
+            bm.setPixel(x, y, NP_COLOR);
+        }
+    }
+
+    private void drawHLine(BufferedImage im, int y, int x1, int x2) {
+        for (int x = x1; x <= x2; x++) {
+            im.setRGB(x, y, NP_COLOR);
+        }
+    }
+
+    private void drawVLine(Bitmap bm, int x, int y1, int y2) {
+        for (int y = y1; y <= y2; y++) {
+            bm.setPixel(x, y, NP_COLOR);
+        }
+    }
+
+    private void drawVLine(BufferedImage im, int x, int y1, int y2) {
+        for (int y = y1; y <= y2; y++) {
+            im.setRGB(x, y, NP_COLOR);
+        }
+    }
+
+    // OS implementations
+    private interface OSDecoder {
+        void decode(byte[] data, OutputStream out) throws IOException, AndrolibException;
+    }
+
+    private class AndroidImpl implements OSDecoder {
+        public void decode(byte[] data, OutputStream out) throws IOException, AndrolibException {
+            Bitmap bm = BitmapFactory.decodeByteArray(data, 0, data.length);
+
+            int width = bm.getWidth(), height = bm.getHeight();
+
+            Bitmap.Config config = bm.getConfig();
+            if (config == null) config = Bitmap.Config.ARGB_8888;
+
+            Bitmap outImg = Bitmap.createBitmap(width + 2, height + 2, config);
+
+            for (int w = 0; w < width; w++)
+                for (int h = 0; h < height; h++) outImg.setPixel(w + 1, h + 1, bm.getPixel(w, h));
+
+            NinePatchData np = getNinePatch(data);
+            drawHLine(outImg, height + 1, np.padLeft + 1, width - np.padRight);
+            drawVLine(outImg, width + 1, np.padTop + 1, height - np.padBottom);
+
+            int[] xDivs = np.xDivs;
+            if (xDivs.length == 0) {
+                drawHLine(outImg, 0, 1, width);
+            } else {
+                for (int i = 0; i < xDivs.length; i += 2) {
+                    drawHLine(outImg, 0, xDivs[i] + 1, xDivs[i + 1]);
+                }
+            }
+
+            int[] yDivs = np.yDivs;
+            if (yDivs.length == 0) {
+                drawVLine(outImg, 0, 1, height);
+            } else {
+                for (int i = 0; i < yDivs.length; i += 2) {
+                    drawVLine(outImg, 0, yDivs[i] + 1, yDivs[i + 1]);
+                }
+            }
+
+            // Some images additionally use Optical Bounds
+            // https://developer.android.com/about/versions/android-4.3.html#OpticalBounds
+            try {
+                OpticalInset oi = getOpticalInset(data);
+
+                for (int i = 0; i < oi.layoutBoundsLeft; i++) {
+                    int x = 1 + i;
+                    outImg.setPixel(x, height + 1, OI_COLOR);
+                }
+
+                for (int i = 0; i < oi.layoutBoundsRight; i++) {
+                    int x = width - i;
+                    outImg.setPixel(x, height + 1, OI_COLOR);
+                }
+
+                for (int i = 0; i < oi.layoutBoundsTop; i++) {
+                    int y = 1 + i;
+                    outImg.setPixel(width + 1, y, OI_COLOR);
+                }
+
+                for (int i = 0; i < oi.layoutBoundsBottom; i++) {
+                    int y = height - i;
+                    outImg.setPixel(width + 1, y, OI_COLOR);
+                }
+            } catch (CantFind9PatchChunkException t) {
+                // This chunk might not exist
+            }
+
+            outImg.compress(Bitmap.CompressFormat.PNG, 100, out);
+            bm.recycle();
+            outImg.recycle();
+        }
+    }
+
+    private class OtherImpl implements OSDecoder {
+        public void decode(byte[] data, OutputStream out) throws IOException, AndrolibException {
             BufferedImage im = ImageIO.read(new ByteArrayInputStream(data));
             int w = im.getWidth(), h = im.getHeight();
 
@@ -118,51 +264,6 @@ public class Res9patchStreamDecoder implements ResStreamDecoder {
             }
 
             ImageIO.write(im2, "png", out);
-        } catch (IOException | NullPointerException ex) {
-            // In my case this was triggered because a .png file was
-            // containing a html document instead of an image.
-            // This could be more verbose and try to MIME ?
-            throw new AndrolibException(ex);
-        }
-    }
-
-    private NinePatchData getNinePatch(byte[] data) throws AndrolibException, IOException {
-        ExtDataInput in = ExtDataInputStream.bigEndian(new ByteArrayInputStream(data));
-        find9patchChunk(in, NP_CHUNK_TYPE);
-        return NinePatchData.decode(in);
-    }
-
-    private OpticalInset getOpticalInset(byte[] data) throws AndrolibException, IOException {
-        ExtDataInput in = ExtDataInputStream.bigEndian(new ByteArrayInputStream(data));
-        find9patchChunk(in, OI_CHUNK_TYPE);
-        return OpticalInset.decode(in);
-    }
-
-    private void find9patchChunk(DataInput in, int magic) throws AndrolibException, IOException {
-        in.skipBytes(8);
-        while (true) {
-            int size;
-            try {
-                size = in.readInt();
-            } catch (IOException ex) {
-                throw new CantFind9PatchChunkException("Could not find nine patch chunk", ex);
-            }
-            if (in.readInt() == magic) {
-                return;
-            }
-            in.skipBytes(size + 4);
-        }
-    }
-
-    private void drawHLine(BufferedImage im, int y, int x1, int x2) {
-        for (int x = x1; x <= x2; x++) {
-            im.setRGB(x, y, NP_COLOR);
-        }
-    }
-
-    private void drawVLine(BufferedImage im, int x, int y1, int y2) {
-        for (int y = y1; y <= y2; y++) {
-            im.setRGB(x, y, NP_COLOR);
         }
     }
 }

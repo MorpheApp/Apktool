@@ -56,10 +56,16 @@ tasks.register<JavaExec>("proguard") {
         JavaVersion.current().isJava11Compatible
     }
 
+    val androidSdkDir = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+        ?: throw GradleException("Missing ANDROID_HOME or ANDROID_SDK_ROOT")
+
+    val androidVersion = 33
+    val androidJar = file("$androidSdkDir/platforms/android-$androidVersion/android.jar")
+
     val proguardRules = file("proguard-rules.pro")
     val originalJar = shadowJar.outputs.files.singleFile
 
-    inputs.files(originalJar.toString(), proguardRules)
+    inputs.files(originalJar.toString(), proguardRules, androidJar)
     outputs.file("build/libs/apktool-$apktoolVersion.jar")
 
     classpath(r8)
@@ -71,6 +77,7 @@ tasks.register<JavaExec>("proguard") {
         "--no-minification",
         "--map-diagnostics:UnusedProguardKeepRuleDiagnostic", "info", "none",
         "--lib", javaLauncher.get().metadata.installationPath.toString(),
+        "--lib", androidJar.absolutePath,
         "--output", outputs.files.singleFile.toString(),
         "--pg-conf", proguardRules.toString(),
         originalJar.toString()

@@ -29,6 +29,17 @@ dependencies {
     api(project(":brut.j.dir"))
     api(project(":brut.j.xml"))
 
+    val androidSdkDir = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+    compileOnly(
+        if (androidSdkDir == null) {
+            GradleException("Missing ANDROID_HOME or ANDROID_SDK_ROOT").printStackTrace()
+
+            "com.google.android:android:4.1.1.4"
+        } else {
+            val androidVersion = 33
+            files("$androidSdkDir/platforms/android-$androidVersion/android.jar")
+        }
+    )
     implementation(libs.baksmali)
     implementation(libs.smali)
     implementation(libs.guava)
