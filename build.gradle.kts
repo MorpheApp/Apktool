@@ -105,21 +105,17 @@ subprojects {
         publishing {
             repositories {
                 maven {
-                    url = if (suffix.contains("SNAPSHOT")) {
-                        uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-                    } else {
-                        uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-                    }
+                    url = uri("https://maven.pkg.github.com/MorpheApp/Apktool")
                     credentials {
-                        username = (project.properties["ossrhUsername"] ?: "").toString()
-                        password = (project.properties["ossrhPassword"] ?: "").toString()
+                        username = System.getenv("GITHUB_ACTOR") ?: project.findProperty("gpr.user").toString()
+                        password = System.getenv("GITHUB_TOKEN") ?: project.findProperty("gpr.key").toString()
                     }
                 }
             }
             publications {
                 register("mavenJava", MavenPublication::class) {
                     from(components["java"])
-                    groupId = "org.apktool"
+                    groupId = "app.morphe"
                     artifactId = project.name
                     version = apktoolVersion
 
@@ -147,9 +143,9 @@ subprojects {
                             }
                         }
                         scm {
-                            connection = "scm:git:git://github.com/iBotPeaches/Apktool.git"
-                            developerConnection = "scm:git:git@github.com:iBotPeaches/Apktool.git"
-                            url = "https://github.com/iBotPeaches/Apktool"
+                            connection = "scm:git:git://github.com/MorpheApp/Apktool.git"
+                            developerConnection = "scm:git:git@github.com:MorpheApp/Apktool.git"
+                            url = "https://github.com/MorpheApp/Apktool"
                         }
                     }
                 }
