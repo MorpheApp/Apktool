@@ -358,6 +358,10 @@ public final class Config {
         }
     }
 
+    public void setAaptBinaryPath(String aaptBinaryPath) {
+        mAaptBinary = new File(aaptBinaryPath);
+    }
+
     public int getAaptVersion() {
         return mAaptVersion;
     }

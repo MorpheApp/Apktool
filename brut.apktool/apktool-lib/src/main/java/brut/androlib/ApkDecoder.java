@@ -53,6 +53,12 @@ public class ApkDecoder {
     private volatile int mMinSdkVersion;
     private BackgroundWorker mWorker;
 
+    public ApkDecoder(ApkInfo apkInfo, Config config) {
+        this(apkInfo.getApkFile(), config);
+
+        mApkInfo = apkInfo;
+    }
+
     public ApkDecoder(ExtFile apkFile, Config config) {
         mApkFile = apkFile;
         mConfig = config;
@@ -70,7 +76,7 @@ public class ApkDecoder {
             mWorker = new BackgroundWorker(mConfig.getJobs() - 1);
         }
         try {
-            mApkInfo = new ApkInfo(mApkFile);
+            if (mApkInfo == null) mApkInfo = new ApkInfo(mApkFile);
             mResDecoder = new ResourcesDecoder(mApkInfo, mConfig);
 
             OS.rmdir(outDir);
@@ -312,8 +318,15 @@ public class ApkDecoder {
         }
 
         // record uncompressed files
+        Map<String, String> resFileMapping = mResDecoder.getResFileMapping();
+        recordUncompressedFiles(resFileMapping);
+
+        // write apk info to file
+        mApkInfo.save(new File(outDir, "apktool.yml"));
+    }
+
+    public void recordUncompressedFiles(Map<String, String> resFileMapping) throws AndrolibException {
         try {
-            Map<String, String> resFileMapping = mResDecoder.getResFileMapping();
             Set<String> uncompressedExts = new HashSet<>();
             Set<String> uncompressedFiles = new HashSet<>();
             Directory in = mApkFile.getDirectory();
@@ -364,8 +377,5 @@ public class ApkDecoder {
         } catch (DirectoryException ex) {
             throw new AndrolibException(ex);
         }
-
-        // write apk info to file
-        mApkInfo.save(new File(outDir, "apktool.yml"));
     }
 }
