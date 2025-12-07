@@ -16,8 +16,8 @@
  */
 package brut.androlib.res.decoder;
 
-import android.content.res.XmlResourceParser;
-import android.util.TypedValue;
+import app.morphe.apktool.content.res.XmlResourceParser;
+import app.morphe.apktool.util.TypedValue;
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.exceptions.CantFindFrameworkResException;
 import brut.androlib.exceptions.UndefinedResObjectException;

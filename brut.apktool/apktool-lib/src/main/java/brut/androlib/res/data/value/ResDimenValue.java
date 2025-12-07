@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.data.value;
 
-import android.util.TypedValue;
+import app.morphe.apktool.util.TypedValue;
 import brut.androlib.exceptions.AndrolibException;
 
 public class ResDimenValue extends ResIntValue {

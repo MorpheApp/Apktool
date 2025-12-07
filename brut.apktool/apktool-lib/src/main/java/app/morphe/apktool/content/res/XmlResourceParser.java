@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package android.content.res;
+package app.morphe.apktool.content.res;
 
-import android.util.AttributeSet;
+import app.morphe.apktool.util.AttributeSet;
 import org.xmlpull.v1.XmlPullParser;
 
 /**

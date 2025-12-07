@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.decoder;
 
-import android.util.TypedValue;
+import app.morphe.apktool.util.TypedValue;
 import brut.androlib.Config;
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.*;
