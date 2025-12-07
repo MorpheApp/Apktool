@@ -29,13 +29,17 @@ public final class AaptManager {
     }
 
     public static String getAaptName(int version) {
-        switch (version) {
-            case 2:
+        if (version == 2) {
+            if (OSDetection.isTermux()) {
+                String osArch = OSDetection.osArch();
+                return "aapt2_" + osArch;
+            } else {
                 return "aapt2";
-            default:
-                return "aapt";
+            }
         }
+        return "aapt";
     }
+
 
     public static File getAaptBinary(int version) throws BrutException {
         String aaptName = getAaptName(version);
@@ -46,7 +50,11 @@ public final class AaptManager {
 
         StringBuilder aaptPath = new StringBuilder("/prebuilt/");
         if (OSDetection.isUnix()) {
-            aaptPath.append("linux");
+            if (OSDetection.isTermux() && version == 2) {
+                aaptPath.append("android");
+            } else {
+                aaptPath.append("linux");
+            }
         } else if (OSDetection.isMacOSX()) {
             aaptPath.append("macosx");
         } else if (OSDetection.isWindows()) {
@@ -56,7 +64,7 @@ public final class AaptManager {
         }
         aaptPath.append("/");
         aaptPath.append(aaptName);
-        if (OSDetection.is64Bit()) {
+        if (!OSDetection.isTermux() && OSDetection.is64Bit()) {
             aaptPath.append("_64");
         }
         if (OSDetection.isWindows()) {
