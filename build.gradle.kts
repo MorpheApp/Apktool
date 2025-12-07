@@ -1,7 +1,7 @@
 import java.io.ByteArrayOutputStream
 
 val version = "2.11.2"
-val suffix = "SNAPSHOT"
+val suffix = ".r2"
 
 // Strings embedded into the build.
 var gitRevision by extra("")
@@ -37,20 +37,8 @@ val gitBranch: String? by lazy {
 }
 
 if ("release" !in gradle.startParameter.taskNames) {
-    val hash = this.gitDescribe
-
-    if (hash == null) {
-        gitRevision = "dirty"
-        apktoolVersion = "$version-dirty"
-        project.logger.lifecycle("Building SNAPSHOT (no .git folder found)")
-    } else {
-        gitRevision = hash
-        apktoolVersion = "$hash-SNAPSHOT"
-        project.logger.lifecycle("Building SNAPSHOT ($gitBranch): $gitRevision")
-    }
-} else {
     gitRevision = ""
-    apktoolVersion = if (suffix.isNotEmpty()) "$version-$suffix" else version;
+    apktoolVersion = if (suffix.isNotEmpty()) "${version}${suffix}" else version;
     project.logger.lifecycle("Building RELEASE ($gitBranch): $apktoolVersion")
 }
 
