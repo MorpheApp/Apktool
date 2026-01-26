@@ -17,7 +17,6 @@
 package brut.androlib.res.decoder;
 
 import brut.androlib.BaseTest;
-import brut.androlib.TestUtils;
 import brut.androlib.res.decoder.data.NinePatchData;
 import brut.util.OSDetection;
 
@@ -36,7 +35,7 @@ public class MissingDiv9PatchTest extends BaseTest {
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        TestUtils.copyResourceDir(MissingDiv9PatchTest.class, "res/decoder/issue1522", sTmpDir);
+        copyResourceDir(MissingDiv9PatchTest.class, "res/decoder/issue1522", sTmpDir);
     }
 
     @Test

@@ -18,9 +18,11 @@ package brut.androlib.res.decoder;
 
 import app.morphe.apktool.content.res.XmlResourceParser;
 import app.morphe.apktool.util.TypedValue;
+import brut.androlib.Config;
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.exceptions.FrameworkNotFoundException;
 import brut.androlib.exceptions.UndefinedResObjectException;
+import brut.androlib.res.decoder.ResChunkPullParser;
 import brut.androlib.res.decoder.data.NamespaceStack;
 import brut.androlib.res.decoder.data.ResChunkHeader;
 import brut.androlib.res.decoder.data.ResStringPool;
@@ -59,6 +61,7 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
     private static final int ATTRIBUTE_IX_VALUE_DATA = 4; // data
     private static final int ATTRIBUTE_LENGTH = 5;
 
+    private static final int ANDROID_PKG_ID = 0x01;
     private static final int PRIVATE_PKG_ID = 0x7F;
 
     private final ResTable mTable;
@@ -213,10 +216,11 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
         if (text == null) {
             return null;
         }
+        int len = text.length();
         holderForStartAndLength[0] = 0;
-        holderForStartAndLength[1] = text.length();
-        char[] chars = new char[text.length()];
-        text.getChars(0, text.length(), chars, 0);
+        holderForStartAndLength[1] = len;
+        char[] chars = new char[len];
+        text.getChars(0, len, chars, 0);
         return chars;
     }
 
@@ -308,20 +312,24 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
         int offset = getAttributeOffset(index);
         int namespace = mAttributes[offset + ATTRIBUTE_IX_NAMESPACE_URI];
 
+        ResId nameId = ResId.of(getAttributeNameResource(index));
+        int pkgId = nameId.getPackageId();
+
         // #2972 - If the namespace index is -1, the attribute is not present, but if the attribute is from system
         // we can resolve it to the default namespace. This may prove to be too aggressive as we scope the entire
         // system namespace, but it is better than not resolving it at all.
-        ResId id = ResId.of(getAttributeNameResource(index));
-        int pkgId = id.getPackageId();
-        if (namespace == -1 && pkgId == 1) {
-            return ANDROID_RES_NS;
-        }
         if (namespace == -1) {
+            if (pkgId == PRIVATE_PKG_ID) {
+                return getNonDefaultNamespaceUri(offset);
+            }
+            if (pkgId == ANDROID_PKG_ID) {
+                return ANDROID_RES_NS;
+            }
             return "";
         }
 
         // Minifiers like removing the namespace, so we will default to default namespace
-        // unless the pkgId of the resource is private. We will grab the non-standard one.
+        // unless the package ID of the resource is private. We will grab the non-standard one.
         String value = mStringPool.getString(namespace);
         if (value != null && !value.isEmpty()) {
             return value;
@@ -373,23 +381,51 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
         // Are improperly decoded when trusting the string pool.
         // Leveraging the resource map allows us to get the proper value.
         // <item android:state_enabled="true" app:d2="false" app:d3="true">
-        String resourceMapValue;
+        String nameStr;
         try {
-            resourceMapValue = decodeFromResourceId(nameId);
+            nameStr = decodeFromResourceId(nameId);
+            if (nameStr != null) {
+                return nameStr;
+            }
         } catch (AndrolibException ignored) {
-            resourceMapValue = null;
-        }
-        if (resourceMapValue != null) {
-            return resourceMapValue;
         }
 
-        String stringPoolValue = mStringPool.getString(name);
-        if (stringPoolValue != null) {
-            return stringPoolValue;
+        // Couldn't decode from resource map, fall back to string pool.
+        nameStr = mStringPool.getString(name);
+        if (nameStr == null) {
+            nameStr = "";
         }
 
-        // If it was not found in either, then we have a bogus resource.
-        return ResEntrySpec.MISSING_PREFIX + nameId;
+        // In certain optimized apps, some attributes's specs are removed despite being used.
+        // Inject a generic spec for the attribute, otherwise we can't rebuild.
+        if (nameId != ResId.NULL) {
+            Config config = mTable.getConfig();
+            boolean skipUnresolved = config.getDecodeResolve() == Config.DecodeResolve.LAZY;
+            try {
+                ResPackage pkg = mTable.getMainPackage();
+
+                // #2836 - Skip item if the resource cannot be resolved.
+                if (skipUnresolved || nameId.getPackageId() != pkg.getId()) {
+                    LOGGER.warning(String.format(
+                        "null attr reference: ns=%s, name=%s, id=%s",
+                        getAttributePrefix(index), nameStr, nameId));
+                    return nameStr;
+                }
+
+                if (nameStr.isEmpty()) {
+                    nameStr = ResEntrySpec.DUMMY_PREFIX + nameId;
+                }
+                nameStr = pkg.addEntrySpec(nameId, nameStr).getName();
+                pkg.addEntry(nameId, ResConfig.DEFAULT, ResAttribute.DEFAULT);
+            } catch (AndrolibException ex) {
+                setFirstError(ex);
+                LOGGER.warning(String.format(
+                    "Could not add missing attr: ns=%s, name=%s, id=%s",
+                    getAttributePrefix(index), nameStr, nameId));
+            }
+        }
+
+        return nameStr;
     }
 
     private String decodeFromResourceId(ResId resId) throws AndrolibException {
@@ -423,29 +459,48 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
         try {
             String stringPoolValue = valueRaw != -1
                 ? ResXmlEncoders.escapeXmlChars(mStringPool.getString(valueRaw)) : null;
-            String resourceMapValue = null;
+            String rawValue = stringPoolValue;
 
-            // Ensure we only track down obfuscated values for reference/attribute type values. Otherwise, we might
-            // spam lookups against resource table for invalid IDs.
+            boolean isExplicitType = valueType != TypedValue.TYPE_NULL;
             if (valueType == TypedValue.TYPE_REFERENCE
                     || valueType == TypedValue.TYPE_DYNAMIC_REFERENCE
                     || valueType == TypedValue.TYPE_ATTRIBUTE
                     || valueType == TypedValue.TYPE_DYNAMIC_ATTRIBUTE) {
-                resourceMapValue = decodeFromResourceId(ResId.of(valueData));
+                // Explicit reference format is optional.
+                isExplicitType = false;
+                // Android prefers the resource map value over what the string pool has.
+                // We only track down obfuscated values for reference/attribute type values.
+                // Otherwise, we might spam lookups against resource table for invalid IDs.
+                String resourceMapValue = decodeFromResourceId(ResId.of(valueData));
+                if (stringPoolValue != null && resourceMapValue != null) {
+                    // Handle a value with a format of "@yyy/xxx", but avoid "@yyy/zzz:xxx"
+                    int slashPos = stringPoolValue.lastIndexOf('/');
+                    if (slashPos != -1) {
+                        int colonPos = stringPoolValue.lastIndexOf(':');
+                        if (colonPos == -1) {
+                            rawValue = stringPoolValue.substring(0, slashPos) + "/" + resourceMapValue;
+                        }
+                    } else if (!stringPoolValue.equals(resourceMapValue)) {
+                        rawValue = resourceMapValue;
+                    }
+                }
             }
 
             // Try to decode from resource table.
             ResId nameId = ResId.of(getAttributeNameResource(index));
-            ResItem value = ResItem.parse(mTable.getCurrentPackage(), valueType, valueData,
-                getPreferredString(stringPoolValue, resourceMapValue));
+            ResItem value = ResItem.parse(mTable.getCurrentPackage(), valueType, valueData, rawValue);
             if (nameId != ResId.NULL) {
                 try {
                     // We need the attribute entry's value to format this value.
                     ResEntrySpec nameSpec = mTable.getEntrySpec(nameId);
-                    ResValue nameDefValue = mTable.getDefaultEntry(nameId).getValue();
+                    ResValue nameValue = mTable.getDefaultEntry(nameId).getValue();
 
-                    if (nameDefValue instanceof ResAttribute) {
-                        decoded = ((ResAttribute) nameDefValue).formatValue(value, false);
+                    if (nameValue instanceof ResAttribute) {
+                        ResAttribute nameAttr = (ResAttribute) nameValue;
+                        if (isExplicitType && !nameAttr.hasSymbolsForValue(value)) {
+                            nameAttr.addType(valueType);
+                        }
+                        decoded = nameAttr.formatValue(value, false);
                     } else {
                         LOGGER.warning("Unexpected attribute name: " + nameSpec);
                     }
@@ -676,26 +731,6 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
         return -1;
     }
 
-    private static String getPreferredString(String stringPoolValue, String resourceMapValue) {
-        String value = stringPoolValue;
-
-        if (stringPoolValue != null && resourceMapValue != null) {
-            int slashPos = stringPoolValue.lastIndexOf('/');
-            int colonPos = stringPoolValue.lastIndexOf(':');
-
-            // Handle a value with a format of "@yyy/xxx", but avoid "@yyy/zzz:xxx"
-            if (slashPos != -1) {
-                if (colonPos == -1) {
-                    String type = stringPoolValue.substring(0, slashPos);
-                    value = type + "/" + resourceMapValue;
-                }
-            } else if (!stringPoolValue.equals(resourceMapValue)) {
-                value = resourceMapValue;
-            }
-        }
-        return value;
-    }
-
     private void resetEventInfo() {
         mEvent = -1;
         mLineNumber = -1;
@@ -708,21 +743,38 @@ public class BinaryXmlResourceParser implements XmlResourceParser {
     }
 
     private void doNext() throws IOException {
-        if (mStringPool == null) {
-            mIn.skipInt(); // XML Chunk AXML Type
-            mIn.skipInt(); // Chunk Size
-
-            mStringPool = ResStringPool.parse(mIn);
-            mNamespaces.increaseDepth();
-            mIsOperational = true;
-        }
-
         if (mEvent == END_DOCUMENT) {
             return;
         }
 
         int event = mEvent;
         resetEventInfo();
+
+        if (mStringPool == null) {
+            ResChunkPullParser parser = new ResChunkPullParser(mIn);
+            if (!parser.next()) {
+                throw new IOException("Input file is empty.");
+            }
+
+            if (parser.chunkType() != ResChunkHeader.RES_XML_TYPE) {
+                throw new IOException("Unexpected chunk: " + parser.chunkName()
+                        + " (expected: RES_XML_TYPE)");
+            }
+
+            parser = new ResChunkPullParser(mIn, parser.dataSize());
+            if (!parser.next()) {
+                throw new IOException("Invalid AXML file.");
+            }
+
+            if (parser.chunkType() != ResChunkHeader.RES_STRING_POOL_TYPE) {
+                throw new IOException("Unexpected chunk: " + parser.chunkName()
+                        + " (expected: RES_STRING_POOL_TYPE)");
+            }
+
+            mStringPool = ResStringPool.parse(parser);
+            mNamespaces.increaseDepth();
+            mIsOperational = true;
+        }
 
         for (;;) {
             if (mDecreaseDepth) {

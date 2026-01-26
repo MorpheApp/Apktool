@@ -20,9 +20,9 @@ import brut.androlib.exceptions.AndrolibException;
 import brut.directory.DirectoryException;
 import brut.directory.ExtFile;
 import brut.yaml.*;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,15 +33,18 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public class ApkInfo implements YamlSerializable {
-    public static final String[] RESOURCES_DIRNAMES = { "res", "r", "R" };
-    public static final String[] RAW_DIRNAMES = { "assets", "lib" };
+    public static final String[] RAW_DIRS = { "assets", "lib" };
 
-    public static final Pattern ORIGINAL_FILENAMES_PATTERN = Pattern.compile(
+    public static final Pattern CLASSES_FILES_PATTERN = Pattern.compile(
+        "classes([2-9]|[1-9][0-9]+)?\\.dex");
+
+    public static final Pattern ORIGINAL_FILES_PATTERN = Pattern.compile(
         "AndroidManifest\\.xml|META-INF/[^/]+\\.(RSA|SF|MF)|stamp-cert-sha256");
 
-    public static final Pattern STANDARD_FILENAMES_PATTERN = Pattern.compile(
-        "[^/]+\\.dex|resources\\.arsc|(" + String.join("|", RESOURCES_DIRNAMES) + "|"
-            + String.join("|", RAW_DIRNAMES) + ")/.*|" + ORIGINAL_FILENAMES_PATTERN.pattern());
+    public static final Pattern STANDARD_FILES_PATTERN = Pattern.compile(
+        "resources\\.arsc|(" + String.join("|", RAW_DIRS) + ")/.*|"
+            + CLASSES_FILES_PATTERN.pattern() + "|"
+            + ORIGINAL_FILES_PATTERN.pattern());
 
     private String mVersion;
     private String mApkFileName;
@@ -68,29 +71,25 @@ public class ApkInfo implements YamlSerializable {
         mDoNotCompress = new ArrayList<>();
     }
 
-    public ApkInfo(ExtFile apkFile) {
-        this();
-        setApkFile(apkFile);
+    public static ApkInfo load(File apkDir) throws AndrolibException {
+        File file = new File(apkDir, "apktool.yml");
+        try (InputStream in = Files.newInputStream(file.toPath())) {
+            return ApkInfo.load(in);
+        } catch (IOException ex) {
+            throw new AndrolibException(ex);
+        }
     }
 
-    public static ApkInfo load(InputStream in) {
+    @VisibleForTesting
+    static ApkInfo load(InputStream in) {
         YamlReader reader = new YamlReader(in);
         ApkInfo apkInfo = new ApkInfo();
         reader.readRoot(apkInfo);
         return apkInfo;
     }
 
-    public static ApkInfo load(ExtFile apkDir) throws AndrolibException {
-        try (InputStream in = apkDir.getDirectory().getFileInput("apktool.yml")) {
-            ApkInfo apkInfo = ApkInfo.load(in);
-            apkInfo.setApkFile(apkDir);
-            return apkInfo;
-        } catch (DirectoryException | IOException ex) {
-            throw new AndrolibException(ex);
-        }
-    }
-
-    public void save(File file) throws AndrolibException {
+    public void save(File apkDir) throws AndrolibException {
+        File file = new File(apkDir, "apktool.yml");
         try (YamlWriter writer = new YamlWriter(Files.newOutputStream(file.toPath()))) {
             write(writer);
         } catch (IOException ex) {

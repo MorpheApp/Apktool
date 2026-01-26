@@ -16,9 +16,6 @@
  */
 package brut.androlib;
 
-import brut.common.BrutException;
-import brut.directory.ExtFile;
-
 import java.io.File;
 
 import org.junit.*;
@@ -29,27 +26,26 @@ public class AndResGuardTest extends BaseTest {
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        TestUtils.copyResourceDir(AndResGuardTest.class, "issue1170", sTmpDir);
+        copyResourceDir(AndResGuardTest.class, "issue1170", sTmpDir);
     }
 
     @Test
-    public void checkifAndResDecodeRemapsRFolder() throws BrutException {
-        ExtFile testApk = new ExtFile(sTmpDir, TEST_APK);
-        ExtFile testDir = new ExtFile(testApk + ".out");
+    public void checkifAndResDecodeRemapsRFolder() throws Exception {
+        File testApk = new File(sTmpDir, TEST_APK);
+        File testDir = new File(testApk + ".out");
         new ApkDecoder(testApk, sConfig).decode(testDir);
 
         assertTrue(new File(testDir, "res/mipmap-hdpi-v4/a.png").isFile());
     }
 
     @Test
-    public void checkIfAndResDecodeRemapsRFolderInRawMode() throws BrutException {
-        sConfig.setForced(true);
+    public void checkIfAndResDecodeIgnoresRFolderInRawMode() throws Exception {
         sConfig.setDecodeResources(Config.DecodeResources.NONE);
 
-        ExtFile testApk = new ExtFile(sTmpDir, TEST_APK);
-        ExtFile testDir = new ExtFile(testApk + ".raw.out");
+        File testApk = new File(sTmpDir, TEST_APK);
+        File testDir = new File(testApk + ".out.raw");
         new ApkDecoder(testApk, sConfig).decode(testDir);
 
-        assertTrue(new File(testDir, "r/a/a.png").isFile());
+        assertTrue(new File(testDir, "unknown/r/a/a.png").isFile());
     }
 }

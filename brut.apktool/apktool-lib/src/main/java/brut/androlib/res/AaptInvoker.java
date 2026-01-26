@@ -19,6 +19,8 @@ package brut.androlib.res;
 import brut.androlib.Config;
 import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.meta.ApkInfo;
+import brut.androlib.meta.UsesFramework;
+import brut.androlib.res.Framework;
 import brut.common.BrutException;
 import brut.util.OS;
 
@@ -39,8 +41,7 @@ public class AaptInvoker {
         mConfig = config;
     }
 
-    public void invoke(File apkFile, File manifest, File resDir, File rawDir, File assetDir, File[] include)
-            throws AndrolibException {
+    public void invoke(File outApk, File manifest, File resDir) throws AndrolibException {
         String aaptPath = mConfig.getAaptBinary();
         if (aaptPath == null || aaptPath.isEmpty()) {
             try {
@@ -51,46 +52,47 @@ public class AaptInvoker {
             }
         }
 
-        List<String> cmd;
-        File resourcesZip = null;
+        List<String> cmd = new ArrayList<>();
+        File resZip = null;
 
         if (resDir != null) {
             File buildDir = new File(resDir.getParent(), "build");
             //noinspection ResultOfMethodCallIgnored
             buildDir.mkdir();
-            resourcesZip = new File(buildDir, "resources.zip");
 
-            if (!resourcesZip.exists()) {
-                // Compile the files into flat arsc files.
-                cmd = new ArrayList<>();
-                cmd.add(aaptPath);
-                cmd.add("compile");
+            resZip = new File(buildDir, "resources.zip");
+            OS.rmfile(resZip);
 
-                cmd.add("--dir");
-                cmd.add(resDir.getAbsolutePath());
+            // Compile the files into flat arsc files.
+            cmd.add(aaptPath);
+            cmd.add("compile");
 
-                // Treats error that used to be valid in aapt1 as warnings in aapt2.
-                cmd.add("--legacy");
+            cmd.add("--dir");
+            cmd.add(resDir.getPath());
 
-                cmd.add("-o");
-                cmd.add(resourcesZip.getAbsolutePath());
+            // Treats error that used to be valid in aapt1 as warnings in aapt2.
+            cmd.add("--legacy");
 
-                if (mConfig.isVerbose()) {
-                    cmd.add("-v");
-                }
+            cmd.add("-o");
+            cmd.add(resZip.getPath());
 
-                if (mConfig.isNoCrunch()) {
-                    cmd.add("--no-crunch");
-                }
-
-                try {
-                    OS.exec(cmd.toArray(new String[0]));
-                    LOGGER.fine("aapt2 compile command ran: ");
-                    LOGGER.fine(cmd.toString());
-                } catch (BrutException ex) {
-                    throw new AndrolibException(ex);
-                }
+            if (mConfig.isVerbose()) {
+                cmd.add("-v");
             }
+
+            if (mConfig.isNoCrunch()) {
+                cmd.add("--no-crunch");
+            }
+
+            try {
+                OS.exec(cmd.toArray(new String[0]));
+                LOGGER.fine("aapt2 compile command ran: ");
+                LOGGER.fine(cmd.toString());
+            } catch (BrutException ex) {
+                throw new AndrolibException(ex);
+            }
+
+            cmd.clear();
         }
 
         if (manifest == null) {
@@ -98,15 +100,14 @@ public class AaptInvoker {
         }
 
         // Link resources to the final apk.
-        cmd = new ArrayList<>();
         cmd.add(aaptPath);
         cmd.add("link");
 
         cmd.add("-o");
-        cmd.add(apkFile.getAbsolutePath());
+        cmd.add(outApk.getPath());
 
         cmd.add("--manifest");
-        cmd.add(manifest.getAbsolutePath());
+        cmd.add(manifest.getPath());
 
         if (mApkInfo.getSdkInfo().getMinSdkVersion() != null) {
             cmd.add("--min-sdk-version");
@@ -165,25 +166,15 @@ public class AaptInvoker {
         // #3427 - Ignore stricter parsing during aapt2.
         cmd.add("--warn-manifest-validation");
 
-        if (rawDir != null) {
-            cmd.add("-R");
-            cmd.add(rawDir.getAbsolutePath());
-        }
-        if (assetDir != null) {
-            cmd.add("-A");
-            cmd.add(assetDir.getAbsolutePath());
-        }
-        if (include != null) {
-            for (File file : include) {
-                cmd.add("-I");
-                cmd.add(file.getPath());
-            }
+        for (File includeFile : getIncludeFiles()) {
+            cmd.add("-I");
+            cmd.add(includeFile.getPath());
         }
         if (mConfig.isVerbose()) {
             cmd.add("-v");
         }
-        if (resourcesZip != null) {
-            cmd.add(resourcesZip.getAbsolutePath());
+        if (resZip != null) {
+            cmd.add(resZip.getPath());
         }
 
         try {
@@ -193,5 +184,43 @@ public class AaptInvoker {
         } catch (BrutException ex) {
             throw new AndrolibException(ex);
         }
+    }
+
+    private List<File> getIncludeFiles() throws AndrolibException {
+        List<File> files = new ArrayList<>();
+
+        UsesFramework usesFramework = mApkInfo.getUsesFramework();
+        List<Integer> frameworkIds = usesFramework.getIds();
+        if (!frameworkIds.isEmpty()) {
+            Framework framework = new Framework(mConfig);
+            String tag = usesFramework.getTag();
+            for (Integer id : frameworkIds) {
+                files.add(framework.getApkFile(id, tag));
+            }
+        }
+
+        List<String> usesLibrary = mApkInfo.getUsesLibrary();
+        if (!usesLibrary.isEmpty()) {
+            String[] libFiles = mConfig.getLibraryFiles();
+            for (String name : usesLibrary) {
+                File libFile = null;
+                if (libFiles != null) {
+                    for (String libEntry : libFiles) {
+                        String[] parts = libEntry.split(":", 2);
+                        if (parts.length == 2 && name.equals(parts[0])) {
+                            libFile = new File(parts[1]);
+                            break;
+                        }
+                    }
+                }
+                if (libFile != null) {
+                    files.add(libFile);
+                } else {
+                    LOGGER.warning("Shared library was not provided: " + name);
+                }
+            }
+        }
+
+        return files;
     }
 }

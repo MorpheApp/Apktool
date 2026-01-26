@@ -17,10 +17,10 @@
 package brut.androlib;
 
 public class Config {
-    public enum DecodeSources { NONE, FULL, ONLY_MAIN_CLASSES }
-    public enum DecodeResources { NONE, FULL, ONLY_MANIFEST }
-    public enum DecodeResolve { REMOVE, DUMMY, KEEP }
-    public enum DecodeAssets { NONE, FULL }
+    public enum DecodeSources { FULL, ONLY_MAIN_CLASSES, NONE }
+    public enum DecodeResources { FULL, ONLY_MANIFEST, NONE }
+    public enum DecodeResolve { DEFAULT, GREEDY, LAZY }
+    public enum DecodeAssets { FULL, NONE }
 
     private final String mVersion;
 
@@ -61,10 +61,10 @@ public class Config {
         mVerbose = false;
 
         // Decode options
-        mDecodeSources = DecodeSources.FULL;
+        mDecodeSources = DecodeSources.ONLY_MAIN_CLASSES;
         mBaksmaliDebugMode = true;
         mDecodeResources = DecodeResources.FULL;
-        mDecodeResolve = DecodeResolve.REMOVE;
+        mDecodeResolve = DecodeResolve.DEFAULT;
         mKeepBrokenResources = false;
         mAnalysisMode = false;
         mDecodeAssets = DecodeAssets.FULL;

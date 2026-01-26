@@ -24,12 +24,14 @@ import brut.androlib.meta.SdkInfo;
 import brut.androlib.meta.VersionInfo;
 import brut.androlib.res.decoder.*;
 import brut.androlib.res.table.*;
+import brut.androlib.res.table.value.ResBag;
 import brut.androlib.res.table.value.ResFileReference;
 import brut.androlib.res.xml.ResXmlUtils;
 import brut.androlib.res.xml.ValuesXmlSerializable;
 import brut.directory.Directory;
 import brut.directory.DirectoryException;
 import brut.directory.ExtFile;
+import brut.directory.FileDirectory;
 import brut.util.OSDetection;
 import brut.xmlpull.MXSerializer;
 import org.xmlpull.v1.XmlSerializer;
@@ -38,27 +40,27 @@ import java.io.*;
 import java.util.*;
 import java.util.logging.Logger;
 
-public class ResourcesDecoder {
-    private static final Logger LOGGER = Logger.getLogger(ResourcesDecoder.class.getName());
+public class ResDecoder {
+    private static final Logger LOGGER = Logger.getLogger(ResDecoder.class.getName());
 
     private final ApkInfo mApkInfo;
     private final Config mConfig;
     private final ResTable mTable;
-    private final Map<String, String> mResFileMapping;
+    private final Map<String, String> mResFileMap;
 
-    public ResourcesDecoder(ApkInfo apkInfo, Config config) {
+    public ResDecoder(ApkInfo apkInfo, Config config) {
         mApkInfo = apkInfo;
         mConfig = config;
         mTable = new ResTable(apkInfo, config);
-        mResFileMapping = new HashMap<>();
+        mResFileMap = new HashMap<>();
     }
 
     public ResTable getTable() {
         return mTable;
     }
 
-    public Map<String, String> getResFileMapping() {
-        return mResFileMapping;
+    public Map<String, String> getResFileMap() {
+        return mResFileMap;
     }
 
     public void decodeResources(File apkDir) throws AndrolibException {
@@ -84,21 +86,30 @@ public class ResourcesDecoder {
 
         try {
             inDir = mApkInfo.getApkFile().getDirectory();
-            outDir = new ExtFile(apkDir).getDirectory();
+            outDir = new FileDirectory(apkDir);
         } catch (DirectoryException ex) {
             throw new AndrolibException(ex);
         }
 
         ResPackage pkg = mTable.getMainPackage();
-        Map<ResType, List<ResEntry>> valuesEntries = new HashMap<>();
 
-        LOGGER.info("Decoding file-resources...");
-        for (ResEntry entry : pkg.listEntries()) {
-            if (entry.getValue() instanceof ResFileReference) {
-                fileDecoder.decode(entry, inDir, outDir, mResFileMapping);
+        LOGGER.info("Decoding value resources...");
+        for (ResEntry entry : new ArrayList<>(pkg.listEntries())) {
+            if (entry.getValue() instanceof ResBag) {
+                ((ResBag) entry.getValue()).resolveKeys();
             }
-            // ResFileDecoder may have replaced an invalid file reference,
-            // so we use "if" here rather than "else if".
+        }
+
+        LOGGER.info("Decoding file resources...");
+        for (ResEntry entry : new ArrayList<>(pkg.listEntries())) {
+            if (entry.getValue() instanceof ResFileReference) {
+                fileDecoder.decode(entry, inDir, outDir, mResFileMap);
+            }
+        }
+
+        LOGGER.info("Generating values XMLs...");
+        Map<ResType, List<ResEntry>> valuesEntries = new HashMap<>();
+        for (ResEntry entry : pkg.listEntries()) {
             if (entry.getValue() instanceof ValuesXmlSerializable) {
                 ResType type = entry.getType();
                 List<ResEntry> entries = valuesEntries.get(type);
@@ -109,8 +120,6 @@ public class ResourcesDecoder {
                 entries.add(entry);
             }
         }
-
-        LOGGER.info("Decoding values */* XMLs...");
         for (Map.Entry<ResType, List<ResEntry>> entry : valuesEntries.entrySet()) {
             generateValuesXml(pkg, entry.getKey(), entry.getValue(), outDir, serial);
         }
@@ -227,7 +236,7 @@ public class ResourcesDecoder {
         Directory inDir, outDir;
         try {
             inDir = mApkInfo.getApkFile().getDirectory();
-            outDir = new ExtFile(apkDir).getDirectory();
+            outDir = new FileDirectory(apkDir);
 
             LOGGER.info("Decoding AndroidManifest.xml with "
                     + (mTable.isMainPackageLoaded() ? "resources" : "only framework resources") + "...");

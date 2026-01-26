@@ -16,19 +16,10 @@
  */
 package brut.androlib.res.table;
 
-import com.google.common.collect.Sets;
-
 import java.util.Objects;
-import java.util.Set;
 
 public class ResEntrySpec {
-    private static final Set<String> INVALID_ENTRY_NAMES = Sets.newHashSet(
-        "0_resource_name_obfuscated", // #3067
-        "(name removed)" // #2940
-    );
-
     public static final String DUMMY_PREFIX = "APKTOOL_DUMMY_";
-    public static final String MISSING_PREFIX = "APKTOOL_MISSING_";
     public static final String RENAMED_PREFIX = "APKTOOL_RENAMED_";
 
     private final ResTypeSpec mTypeSpec;
@@ -40,13 +31,30 @@ public class ResEntrySpec {
         assert typeSpec.getId() == id.getTypeId();
         mTypeSpec = typeSpec;
         mId = id;
-        // Some apps had their entry names collapsed to a single value in
-        // the key string pool. Rename to avoid duplicates.
-        if (name == null || name.isEmpty() || INVALID_ENTRY_NAMES.contains(name)) {
-            mName = RENAMED_PREFIX + id;
-        } else {
-            mName = name;
+        // Some apps had their entry names obfuscated or collapsed to a single
+        // value in the key string pool.
+        mName = isValidEntryName(name) ? name : RENAMED_PREFIX + id;
+    }
+
+    private static boolean isValidEntryName(String name) {
+        // Must not be empty.
+        int len = name.length();
+        if (len == 0) {
+            return false;
         }
+        // Must start with a valid Java identifier start character.
+        if (!Character.isJavaIdentifierStart(name.charAt(0))) {
+            return false;
+        }
+        // The rest must be valid Java identifier part characters or any of the
+        // whitelisted special characters.
+        for (int i = 1; i < len; i++) {
+            char ch = name.charAt(i);
+            if (!Character.isJavaIdentifierPart(ch) && ch != '.' && ch != '-') {
+                return false;
+            }
+        }
+        return true;
     }
 
     public ResTypeSpec getTypeSpec() {
@@ -76,18 +84,6 @@ public class ResEntrySpec {
     public String getFullName(boolean excludePackage, boolean excludeType) {
         return (excludePackage ? "" : getPackage().getName() + ":")
                 + (excludeType ? "" : getTypeName() + "/") + mName;
-    }
-
-    public boolean isDummy() {
-        return mName.startsWith(DUMMY_PREFIX);
-    }
-
-    public boolean isMissing() {
-        return mName.startsWith(MISSING_PREFIX);
-    }
-
-    public boolean isRenamed() {
-        return mName.startsWith(RENAMED_PREFIX);
     }
 
     @Override

@@ -41,24 +41,24 @@ public abstract class ResItem extends ResValue {
         STANDARD_TYPE_FORMATS.put("string", Sets.newHashSet("string"));
     }
 
-    public abstract String getFormat();
-
     public static ResItem parse(ResPackage pkg, int type, int data, String rawValue) {
         switch (type) {
             case TypedValue.TYPE_NULL:
                 return data == TypedValue.DATA_NULL_EMPTY ? ResPrimitive.EMPTY : ResReference.NULL;
             case TypedValue.TYPE_REFERENCE:
             case TypedValue.TYPE_DYNAMIC_REFERENCE:
-                return data != 0 || rawValue != null
+                return (data != 0 || (rawValue != null && !rawValue.isEmpty()))
                     ? new ResReference(pkg, ResId.of(data), rawValue)
                     : ResReference.NULL;
             case TypedValue.TYPE_ATTRIBUTE:
             case TypedValue.TYPE_DYNAMIC_ATTRIBUTE:
-                return data != 0 || rawValue != null
+                return (data != 0 || (rawValue != null && !rawValue.isEmpty()))
                     ? new ResReference(pkg, ResId.of(data), rawValue, ResReference.Type.ATTRIBUTE)
                     : ResReference.NULL;
             case TypedValue.TYPE_STRING:
-                return new ResString(rawValue);
+                return (rawValue != null && !rawValue.isEmpty())
+                    ? new ResString(rawValue)
+                    : ResString.EMPTY;
             case TypedValue.TYPE_FLOAT:
             case TypedValue.TYPE_DIMENSION:
             case TypedValue.TYPE_FRACTION:
@@ -72,4 +72,6 @@ public abstract class ResItem extends ResValue {
                 return null;
         }
     }
+
+    public abstract String getFormat();
 }

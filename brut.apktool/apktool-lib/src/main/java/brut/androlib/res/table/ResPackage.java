@@ -23,8 +23,10 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.logging.Logger;
 
 public class ResPackage {
@@ -36,6 +38,7 @@ public class ResPackage {
     private final Map<Integer, ResTypeSpec> mTypeSpecs;
     private final Map<Pair<Integer, ResConfig>, ResType> mTypes;
     private final Map<ResId, ResEntrySpec> mEntrySpecs;
+    private final Map<Integer, Set<String>> mEntryNames;
     private final Map<Pair<ResId, ResConfig>, ResEntry> mEntries;
     private final Map<String, ResOverlayable> mOverlayables;
 
@@ -46,6 +49,7 @@ public class ResPackage {
         mTypeSpecs = new HashMap<>();
         mTypes = new HashMap<>();
         mEntrySpecs = new HashMap<>();
+        mEntryNames = new HashMap<>();
         mEntries = new HashMap<>();
         mOverlayables = new HashMap<>();
     }
@@ -152,8 +156,24 @@ public class ResPackage {
 
         int typeId = id.getTypeId();
         ResTypeSpec typeSpec = getTypeSpec(typeId);
+
+        // Obfuscation can cause specs to be generated using existing names.
+        // Enforce uniqueness by renaming the spec when that happens.
+        Set<String> entryNames = mEntryNames.get(typeId);
+        if (entryNames == null) {
+            entryNames = new HashSet<>();
+            mEntryNames.put(typeId, entryNames);
+        } else if (entryNames.contains(name)) {
+            // Clear the name to force a rename.
+            name = "";
+        }
+
         entrySpec = new ResEntrySpec(typeSpec, id, name);
         mEntrySpecs.put(id, entrySpec);
+
+        // Record the name to enforce uniqueness.
+        entryNames.add(entrySpec.getName());
+
         return entrySpec;
     }
 
@@ -184,21 +204,11 @@ public class ResPackage {
     }
 
     public ResEntry addEntry(ResId id, ResConfig config, ResValue value) throws AndrolibException {
-        return addEntry(id, config, value, false);
-    }
-
-    public ResEntry addEntry(ResId id, ResConfig config, ResValue value, boolean overwrite)
-            throws AndrolibException {
         Pair<ResId, ResConfig> entryKey = Pair.of(id, config);
         ResEntry entry = mEntries.get(entryKey);
         if (entry != null) {
-            if (overwrite) {
-                LOGGER.warning(String.format(
-                    "Overwriting repeated entry: id=%s, config=%s", id, config));
-            } else {
-                throw new AndrolibException(String.format(
-                    "Repeated entry: id=%s, config=%s", id, config));
-            }
+            throw new AndrolibException(String.format(
+                "Repeated entry: id=%s, config=%s", id, config));
         }
 
         ResEntrySpec entrySpec = getEntrySpec(id);
@@ -225,17 +235,31 @@ public class ResPackage {
         return mEntries.values();
     }
 
-    public ResOverlayable addOverlayable(String name, String actor) {
+    public boolean hasOverlayable(String name) {
+        return mOverlayables.containsKey(name);
+    }
+
+    public ResOverlayable getOverlayable(String name) throws UndefinedResObjectException {
+        ResOverlayable overlayable = mOverlayables.get(name);
+        if (overlayable == null) {
+            throw new UndefinedResObjectException(String.format("overlayable: name=%s", name));
+        }
+        return overlayable;
+    }
+
+    public ResOverlayable addOverlayable(String name, String actor) throws AndrolibException {
         ResOverlayable overlayable = mOverlayables.get(name);
         if (overlayable != null) {
-            LOGGER.warning(String.format(
-                "Repeated overlayable: name=%s, actor=%s", name, actor));
-            return overlayable;
+            throw new AndrolibException(String.format("Repeated overlayable: name=%s", name));
         }
 
         overlayable = new ResOverlayable(this, name, actor);
         mOverlayables.put(name, overlayable);
         return overlayable;
+    }
+
+    public int getOverlayableCount() {
+        return mOverlayables.size();
     }
 
     public Collection<ResOverlayable> listOverlayables() {

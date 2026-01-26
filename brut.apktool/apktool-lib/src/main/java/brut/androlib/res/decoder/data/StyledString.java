@@ -24,6 +24,7 @@ import com.google.common.collect.PeekingIterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 public class StyledString implements CharSequence {
     private static final Logger LOGGER = Logger.getLogger(StyledString.class.getName());
@@ -65,7 +66,8 @@ public class StyledString implements CharSequence {
             return mDecodedText;
         }
 
-        mBuffer = new StringBuilder(mText.length() * 2);
+        int len = mText.length();
+        mBuffer = new StringBuilder(len * 2);
         mLastOffset = 0;
 
         // Recurse top-level tags.
@@ -75,7 +77,7 @@ public class StyledString implements CharSequence {
         }
 
         // Write the remaining encoded raw text.
-        if (mLastOffset < mText.length()) {
+        if (mLastOffset < len) {
             mBuffer.append(ResXmlEncoders.escapeXmlChars(mText.substring(mLastOffset)));
         }
 
@@ -99,9 +101,10 @@ public class StyledString implements CharSequence {
         mBuffer.append('<').append(name);
         if (attributes != null) {
             for (Map.Entry<String, String> entry : attributes.entrySet()) {
-                mBuffer.append(' ').append(entry.getKey()).append("=\"")
-                       .append(ResXmlEncoders.escapeXmlChars(entry.getValue()))
-                       .append('"');
+                mBuffer.append(' ')
+                    .append(entry.getKey()).append("=\"")
+                    .append(ResXmlEncoders.escapeXmlChars(entry.getValue()))
+                    .append('"');
             }
         }
         // If an opening tag is followed by a matching closing tag, write as an empty-element tag.
@@ -117,10 +120,11 @@ public class StyledString implements CharSequence {
         }
 
         // Write encoded raw text preceding the closing tag.
-        if (spanEnd > mLastOffset && mText.length() >= spanEnd) {
+        int len = mText.length();
+        if (spanEnd > mLastOffset && len >= spanEnd) {
             mBuffer.append(ResXmlEncoders.escapeXmlChars(mText.substring(mLastOffset, spanEnd)));
-        } else if (mText.length() >= mLastOffset && mText.length() < spanEnd) {
-            LOGGER.warning("Span (" + name + ") exceeds text length " + mText.length());
+        } else if (len >= mLastOffset && len < spanEnd) {
+            LOGGER.warning("Span (" + name + ") exceeds text length " + len);
             mBuffer.append(ResXmlEncoders.escapeXmlChars(mText.substring(mLastOffset)));
         }
         mLastOffset = spanEnd;
@@ -130,8 +134,9 @@ public class StyledString implements CharSequence {
     }
 
     public static class Span {
-        private static final Splitter.MapSplitter ATTRIBUTES_SPLITTER =
-            Splitter.on(';').omitEmptyStrings().withKeyValueSeparator(Splitter.on('=').limit(2));
+        private static final Splitter.MapSplitter ATTR_SPLITTER = Splitter.on(
+            Pattern.compile(";(?=[\\p{L}_][\\p{L}\\p{N}_.-]*=)"))
+                .withKeyValueSeparator(Splitter.on('=').limit(2));
 
         private final String mTag;
         private final int mFirstChar;
@@ -157,14 +162,12 @@ public class StyledString implements CharSequence {
 
         public String getName() {
             int separatorIdx = mTag.indexOf(';');
-            return separatorIdx == -1 ? mTag : mTag.substring(0, separatorIdx);
+            return separatorIdx != -1 ? mTag.substring(0, separatorIdx) : mTag;
         }
 
         public Map<String, String> getAttributes() {
             int separatorIdx = mTag.indexOf(';');
-            return separatorIdx != -1 ? ATTRIBUTES_SPLITTER.split(
-                mTag.substring(separatorIdx + 1, mTag.endsWith(";") ? mTag.length() - 1 : mTag.length())
-            ) : null;
+            return separatorIdx != -1 ? ATTR_SPLITTER.split(mTag.substring(separatorIdx + 1)) : null;
         }
     }
 }

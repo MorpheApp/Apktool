@@ -51,13 +51,12 @@ public class ResPlural extends ResBag implements ValuesXmlSerializable {
     @Override
     public void serializeToValuesXml(XmlSerializer serial, ResEntry entry)
             throws AndrolibException, IOException {
-        serial.startTag(null, "plurals");
+        String tagName = "plurals";
+        serial.startTag(null, tagName);
         serial.attribute(null, "name", entry.getName());
 
         for (RawItem item : mItems) {
             int key = item.getKey();
-            ResItem value = item.getValue();
-
             String quantity;
             switch (key) {
                 case ATTR_OTHER:
@@ -83,6 +82,7 @@ public class ResPlural extends ResBag implements ValuesXmlSerializable {
                     continue;
             }
 
+            ResItem value = item.getValue();
             String body;
             if (value instanceof ResString) {
                 body = ResXmlEncoders.enumerateNonPositionalSubstitutionsIfRequired(
@@ -100,7 +100,7 @@ public class ResPlural extends ResBag implements ValuesXmlSerializable {
             serial.endTag(null, "item");
         }
 
-        serial.endTag(null, "plurals");
+        serial.endTag(null, tagName);
     }
 
     @Override
